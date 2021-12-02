@@ -23,7 +23,6 @@ final_pos = reduce(input, init = (0,0)) do last,instr
 end
 
 #part 2
-using LinearAlgebra
 
 trav,depth = final_pos
 trav*depth
