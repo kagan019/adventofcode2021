@@ -1,6 +1,6 @@
-part = :winfirst
+part = :parttwo
 input = cd("day04") do 
-    read("sample.txt",String)
+    read("input.txt",String)
 end |> x->split(x,",") 
 begin
     callednums, boards = (vcat(input[begin:end-1], input[end][1]),input[end][4:end])
@@ -47,38 +47,6 @@ function has_bingo(mark :: Matrix{Bool})
     has_vertical || has_horiz
 end 
 
-function find_first_bingo(marks :: Vector{Matrix{Bool}}) :: Union{Int,Symbol}
-    try
-        Iterators.dropwhile(enumerate(map(has_bingo,marks))) do (i,h)
-            !h
-        end |> first |> x->x[1]
-    catch y
-        if isa(y,ArgumentError)
-            :nobingo
-        end
-    end
-end
-
-function find_last_bingo(marks :: Vector{Matrix{Bool}}) :: Int
-    stack_of_winners = Iterators.reduce(enumerate(map(has_bingo,marks)), init=(Set(),Vector{Int}())) do (s,v), (i,h)
-        s :: Set; v :: Vector{Int}
-        if h && i ∉ s 
-            push!(last,i)
-            push!(v, i)
-        end
-    end
-    all_done_stack = Iterators.dropwhile(stack_of_winners) do s,v
-        length(v) < length(boards)
-    end
-    try
-        first(all_done_stack) |> x->last(x[1])
-    catch z
-        if isa(z, ArgumentError)
-            stack_of_winners |> collect |> last |> x->last(x[1])
-        end
-    end
-end
-
 begin
     begin
         marks = similar(boards, Matrix{Bool})
@@ -118,14 +86,19 @@ begin
         map(has_bingo, marks)
     end
     
+    if part == :partone
+        callidx, first_bingo = Iterators.dropwhile(x -> true ∉ x[2], enumerate(bingo_rounds)) |> first
+        bingo_board_idx = findall((==)(true), first_bingo)[1]
+    elseif part == :parttwo
+        callidx, last_bingo = Iterators.takewhile(x->false ∈ x[2], enumerate(bingo_rounds)) |> collect |> last
+        bingo_board_idx = findall((==)(false), last_bingo)[1]
+        callidx = callidx +  1 # want the number called when it actually wins
+    end
 end
 
-first_bingo = Iterators.dropwhile(x -> true ∉ x, bingo_rounds) |> first
-    findall((==)(true), first_bingo)[0]
 bingo_call = callednums[callidx]
 bingo_board = boards[bingo_board_idx]
 mark_board = marks[bingo_board_idx]
-
 begin
     score = bingo_board[.~mark_board] |> sum
     score = score * bingo_call
