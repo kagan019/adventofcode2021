@@ -53,6 +53,7 @@ end
 counts_of_points = map(
     (part == :partone) ? onlyvh : onlyvhd 
 ) do l
+    # this solution is works generally, for even nondiagonal lines.
     dx,dy = red(l.x2-l.x1,l.y2-l.y1)
     all_points_on_line = Iterators.takewhile(
         p->between(p,l),
