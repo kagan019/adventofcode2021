@@ -30,7 +30,7 @@ function simulate(vel)
         veli = (sign(veli[1]) * max(0,(abs(veli[1]) - 1)), veli[2] - 1)
     end
     Pos
-end 
+end
 
 simulate((6,9)) |> repr
 
@@ -132,14 +132,14 @@ for (xvel,stps)=valid_xvels|>collect
     for yv=targetY[1]:targetY[2]
         for stp=stps |> collect
             stationary = xvel == stp # due to drag
-            if stationary
-                #must reach yv after at least stp steps
-
-                
+            if stationary 
+                #find the maximum and solve there
             else
                 #must reach yv after exactly stp steps
-
-
+                yvel = (yv + arith(stp-1)) / stp
+                if isinteger(yvel)
+                    maxyvel = max(maxyvel,yv)
+                end
             end
         end
     end
