@@ -1,6 +1,6 @@
 begin
     input = cd("day07") do
-        split(read("input.txt", String), ",")
+        split(read("sample.txt", String), ",")
     end
     input = map(input) do i
         parse(Int,i)
@@ -35,7 +35,7 @@ rcosts |> repr
 # lsum = [0, c0, 2c0+c1, 3c0+2c1+c2, 4c0+3c1+2c2+1c3, ...]
 # rsum = [..., 4c0'+3c1'+2c2'+c3', 3c0'+2c1'+c2', 2c0'+c1', c0', 0] 
 
-fuelreq = map(Base.splat(+), zip(lcosts,rcosts))
+fuelreq = lcosts .+ rcosts
 min(fuelreq...)
 
 #part 2
@@ -43,5 +43,5 @@ min(fuelreq...)
 lexp = accumulate(+,lcosts)
 rexp = reverse(accumulate(+,reverse(rcosts)))
 
-crabeng = map(Base.splat(+), zip(lexp,rexp))
+crabeng = lexp .+ rexp
 min(crabeng...)
