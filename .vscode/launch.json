@@ -6,8 +6,8 @@
     "configurations": [
         {
             "type": "julia",
-            "request": "attach",
-            "name": "attach.jl",
+            "request": "launch",
+            "name": "launch.jl",
             "program": "${file}",
             "stopOnEntry": true,
             "cwd": "${workspaceFolder}",
