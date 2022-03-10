@@ -1,41 +1,59 @@
 flat = collect ∘ Iterators.flatten 
 
+[[[1]],[[2]],[[3]],[]] .|> flat
+
+
 struct Rot
-    xface :: Union{Tuple{Bool, Bool}, Bool} # either num turns around z or +/-z
-    yface :: Tuple{Bool, Bool} # around new z
+    # the orientation of x, 0-3 turns around z or +/-z
+    xface :: Union{Tuple{Bool, Bool}, Bool} 
+    # the number of turns around the new x
+    yface :: Tuple{Bool, Bool} 
 end
 
 const Pos = Tuple{Int,Int,Int}
 
+
 function rotate(r :: Rot, p :: Pos) :: Pos
     signify(b :: Bool) = Int(!b)*2-1
-    x,y,z = tuple(p)
-    y,z = begin
-        t,o = r.yface
-        y = signify(t) * y
+    function turn_plane(t :: Bool,o :: Bool, x,y)
+        # no. ccw turns looking toward axis +(x cross y)
+        # two turns: flip
+        x,y = (signify(t),) .* (x,y)
+        # rotate ccw one turn
         if o
-            z,y
+            -y,x
         else
-            y,z
+            x,y
         end
     end
+
+    x,y,z = p
+    y,z = turn_plane(r.yface..., y,z)
     x,y,z = if isa(r.xface,Bool)
-        x = signify(r.xface)*x
-        y,z,x
+        # false: 1 turn ccw looking at (global) +y
+        # true: 1 turn cw
+        x,z = turn_plane(r.xface,true,x,z)
+        x,y,z
     else
-        t,o = r.xface
-        x = signify(t)*x
-        if o
-            y,x,z
-        else
-            x,y,z
-        end
+        x,y = turn_plane(r.xface...,x,y)
+        x,y,z
     end 
     (x,y,z)
 end
-rotate(Rot(false,(false,false)), (1,-1,0))
 
-[[[1]],[[2]],[[3]],[]] .|> flat
+rotate(Rot((true,false),(false,false)), (1,-1,0))
+
+struct Tran
+    r :: Rot
+    p :: Pos
+end
+
+function (t :: Tran)(p :: Pos)
+    rotated = rotate(t.r,p)
+    transformed = rotated .+ t.p 
+end
+
+const Scanner = Vector{Pos}
 
 begin
 input = split(read("day19/sample.txt", String),"\n")
@@ -48,16 +66,16 @@ input = reduce(input, init=[]) do red,nxt
     red
 end
 input = map(input) do scnr
-    map(scnr) do ln
+    (map(scnr :: Vector{<:AbstractString}) do ln
         m = match(r"([-]?[0-9]+),([-]?[0-9]+),([-]?[0-9]+)",ln)
         if m !== nothing
-            [(parse.([Int],m.captures)...)]
+            Pos[parse.([Int],m.captures) |> Tuple]
         else
             Pos[]
         end
-    end |> Iterators.flatten |> collect
+    end |> flat) :: Scanner
 end 
-end :: Vector{Vector{Pos}}
+end :: Vector{Scanner}
 
 
 function eachrot()
@@ -70,17 +88,18 @@ function eachrot()
 end
 
 begin
-sloc = [nothing for _ in input]
-sloc[1] = (Pos(0,0,0),Rot((false,false),(false,false)))
+sloc = Union{Tran,Nothing}[nothing for _ = input]
+sloc[1] = Tran(Rot((false,false),(false,false)),(0,0,0))
 end
 
-function trymatch(s1 :: Int, s2 :: Int)
+function trymatch(s1 :: Int, s2 :: Int) :: Tuple{Pos,Rot}
     for b1=eachindex(input[s1])
         for b2=eachindex(input[s2])
             for rot=eachrot()
-                translation = tuple(input[s1][b1]) .- tuple(input[s2][b2])
                 rotated = rotate.([rot],input[s2])
+                translation = tuple(input[s1][b1]) .- tuple(rotated[b2])
                 transformed = (tuple.(input[s2]) .+ [translation])
+
             end 
         end
     end
@@ -98,81 +117,15 @@ function matchall()
     end
 end
 
-# relative pos from scanner colidx to rowidx
-function rp()
-    relpos = Matrix{Union{Tuple{Pos,Rot},Nothing}}(nothing,length(input),length(input))
-    project(dims :: Int, beacon :: Pos) = getindex(tuple(beacon), 1:dims)
-    ovlp_range = -2000:2000
-    origins1d = Pos.(ovlp_range,[0],[0])
-    for si=eachindex(input)
-        print("$(si)/$(lastindex(input))\n")
-        for rot=eachrot
-            rotated = rotate.([rot], input[si])
-            #fully translated scanner for each origin
-            transformed1d = [
-                orgn.x => (project.([1], gallilean.([orgn],rotated))) 
-                for orgn=origins1d
-            ] |> Dict
-            for sj=si+1:lastindex(input)
-                proj1d = project.([1],input[sj]) |> Set
-                proj2d = project.([2],input[sj]) |> Set
-                scannerj = input[sj] |> Set
-                successx = map(ovlp_range) do tryx
-                    isect = intersect(transformed1d[tryx],proj1d)
-                    if length(isect) >= 12
-                        Int[tryx]
-                    else
-                        Int[]
-                    end
-                end |> flat
-                successx :: Vector{Int}
-                
-                successxy = Tuple{Int,Int}[]
-                for (x,)=successx
-                    origins2d = Pos.([x],ovlp_range,[0])
-                    transformed2d = [
-                        orgn.y => (project.([2],gallilean.([orgn],rotated))) 
-                        for orgn=origins2d
-                    ] |> Dict
-                    for tryy=ovlp_range
-                        isect = intersect(transformed2d[tryy],proj2d)
-                        if length(isect) >= 12
-                            push!(successxy,(x,tryy))
-                        end
-                    end
-                end
-
-                for (x,y)=successxy
-                    origins3d = Pos.([x],[y],ovlp_range)
-                    transformed3d = [
-                        orgn.z => (gallilean.([orgn],rotated)) 
-                        for orgn=origins3d
-                    ] |> Dict
-                    for tryz=ovlp_range
-                        isect = intersect(transformed3d[tryz],scannerj)
-                        if length(isect) >= 12
-                            if relpos[si,sj] !== nothing
-                                throw(DomainError([relpos[si,sj], "->", (Pos(x,y,tryz),rot)]))
-                            end
-                            relpos[si,sj] = (Pos(x,y,tryz),rot)
-                        end
-                    end
-                end
-            end
-        end
+function countbeacons()
+    beacons = Set()
+    for (i,scn)=enumerate(input)
+        rotated = rotate.(sloc[i][2], scn)
+        transformed = rotated .+ sloc[i][1]
+        insert!.([beacons],scn)
     end
-    return relpos
 end
 
-print(rp())
-# here I cached the output
-relpos = Union{Nothing, Tuple{Pos, Rot}}[
-    nothing nothing nothing nothing nothing; 
-    nothing nothing nothing (Pos(-160, 1134, 23), Rot((false, false), (false, false))) nothing; 
-    nothing nothing nothing nothing nothing; 
-    nothing nothing nothing nothing nothing; 
-    nothing nothing nothing nothing nothing
-]
 
 function num_beacons()
     nb = length.(input) |> sum
