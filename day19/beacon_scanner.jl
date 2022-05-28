@@ -50,7 +50,28 @@ end
 
 function (t :: Tran)(p :: Pos)
     rotated = rotate(t.r,p)
-    transformed = rotated .+ t.p 
+    transformed = rotated .+ t.p
+end
+
+function compose(second :: Tran, first :: Tran)
+    # rotation r ∘ tranlation t = rotate(r,t) ∘ t
+    translation after rotation (Tran)
+    [ cos -sin xt
+      sin cos  yt
+       0    0  1]
+    rotation after translation
+    [ cos -sin (xt cos - yt sin)
+      sin  cos 
+       0   0   1 ]  
+    
+    
+    [ cos -sin 0 
+     sin cos  0
+     0    0  1]
+    [ 1   xt
+        1 yt
+          1 ]
+
 end
 
 const Scanner = Vector{Pos}
@@ -92,53 +113,50 @@ sloc = Union{Tran,Nothing}[nothing for _ = input]
 sloc[1] = Tran(Rot((false,false),(false,false)),(0,0,0))
 end
 
-function trymatch(s1 :: Int, s2 :: Int) :: Tuple{Pos,Rot}
-    for b1=eachindex(input[s1])
-        for b2=eachindex(input[s2])
-            for rot=eachrot()
-                rotated = rotate.([rot],input[s2])
-                translation = tuple(input[s1][b1]) .- tuple(rotated[b2])
-                transformed = (tuple.(input[s2]) .+ [translation])
-
-            end 
+function trymatch(s1 :: Int, s2 :: Int) :: Union{Tran,Nothing}
+    for b1=eachindex(input[s1] :: Scanner)
+        for rot=eachrot()
+            rotated = rotate.([rot],input[s2])
+            for b2=eachindex(rotated)
+                translation = input[s1][b1] .- rotated[b2]
+                transformed = [rd .+ translation for rd=rotated]
+                if length(intersect(transformed,input[s1])) >= 12
+                    return Tran(rot,translation)
+                end
+            end
         end
     end
+    return nothing
 end
 
 function matchall()
-    while !all(map(nisn,haspos))
+    while !all(map((!) ∘ isnothing,haspos))
         for s1=eachindex(sloc)
             if isnothing(sloc[s1]); continue end
             for s2=eachindex(sloc)
                 if !isnothing(sloc[s2]); continue end
-                sloc[s2] = trymatch(s1,s2)
+                # s1 is something, s2 is nothing
+                mtch = trymatch(s1,s2)
+                sloc[s2] = (!isnothing(mtch)) ? compose(mtch,sloc[s1]) : nothing
             end
         end
     end
 end
 
 function countbeacons()
+    assert(length(sloc) == length(input))
     beacons = Set()
     for (i,scn)=enumerate(input)
-        rotated = rotate.(sloc[i][2], scn)
-        transformed = rotated .+ sloc[i][1]
-        insert!.([beacons],scn)
+        scn :: Scanner
+        sloc[i] :: Tran
+        transformed = sloc[i].(scn) :: Scanner
+        insert!.([beacons],transformed)
     end
+    beacons |> length
 end
 
 
-function num_beacons()
-    nb = length.(input) |> sum
-    for ci=eachindex(IndexCartesian(), relpos)
-        if relpos[ci] !== nothing
-            i,j = Tuple(ci)
-            p,r = relpos[ci]
-            rotated = rotate.([r],input[i])
-            transformed = gallilean.([p],rotated)
-            nb -= intersect(transformed, input[j]) |> length
-        end
-    end
-    return nb
+function main()
+    matchall()
+    countbeacons()
 end
-
-num_beacons()
